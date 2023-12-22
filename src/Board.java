@@ -1,28 +1,79 @@
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.util.Objects;
+import java.awt.event.*;
+import java.util.ArrayList;
 
 @SuppressWarnings("SpellCheckingInspection")
-public class Board extends JPanel implements ActionListener {
+public class Board extends JPanel implements ActionListener, MouseListener, MouseMotionListener {
     int square_width = 75, square_height = 75;
     Frame parent;
     private Graphics2D g2d;
+    private ArrayList<Piece> board;
+    private Point curr_click;
     Board(int parent_width, int parent_height, Frame parent) {
         setLocation((parent_width - square_width*8)/2, (parent_height-square_height*8)/2 - 10);
         setSize(square_width * 8, square_height * 8);
         setLayout(null);
 
         this.parent = parent;
+        this.curr_click = null;
 
+        init_board();
 
+        addMouseListener(this);
+        addMouseMotionListener(this);
         setVisible(true);
     }
 
-    //  rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR
-    //  rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR
-    private void set_from_fen(String fen) {
+    /*
+    Given a 0-indexed rank and file number starting the count from top left
+    will return the square coordinates as referred to in chess
+    E.x. 0,0 --> a8
+     */
+    private String get_square_coord(int rank, int file) {
+        String[] files = new String[] {"a", "b", "c", "d", "e", "f", "g", "h"};
+        return String.format(files[file] + "%d", 8 - rank);
+    }
+
+    private void init_board() {
+        String fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+
+        board = new ArrayList<>();
+        int file = 0, rank = 0;
+        for (char c: fen.toCharArray()) {
+            if (c == '/') {
+                file = 0; rank += 1;
+                continue;
+            }
+
+            // CHAR IS A NUMBER => skip some squares
+            if ((int) c >= 48 && (int) c <= 57) {
+                int shift = (int) c - 48;
+
+                if (shift == 8) {
+                    file += 7;
+                } else {
+                    file += Math.max(shift, 1); // at minimum needs to move x over by 1
+                }
+
+                continue;
+            }
+
+            int color = -1;
+            // UPPERCASE => white
+            if ((int) c >= 65 && (int) c <= 90) { color = Piece.WHITE; }
+            // LOWERCASE => black
+            else if ((int) c >= 97 && (int) c <= 122) { color = Piece.BLACK; }
+
+            Piece piece = new Piece(rank, file, c, color);
+            board.add(piece);
+
+            file += 1;
+        }
+        repaint();
+    }
+
+    private void set_gui_from_fen(String fen) {
         int x = 0;
         int y = 0;
         for (char c: fen.toCharArray()) {
@@ -72,7 +123,24 @@ public class Board extends JPanel implements ActionListener {
         repaint();
     }
 
-    String curr_fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR";
+    /*
+    Given Piece.id parameter returns the image
+     */
+    private Image image_from_piece(char c) {
+        String path = null;
+        if ((int) c >= 65 && (int) c <= 90) {
+            path = String.format("src/materials/white/%c.png", c);
+        }
+        // LOWERCASE => black
+        else if ((int) c >= 97 && (int) c <= 122) {
+            path = String.format("src/materials/black/%c.png", c);
+        }
+
+        if (path == null) { System.err.println("PATH WAS NULL: image_from_piece()"); }
+
+        return Toolkit.getDefaultToolkit().getImage(path);
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -97,31 +165,83 @@ public class Board extends JPanel implements ActionListener {
                     g2d.setColor(light_square);
                 }
                 if (x == 0) {
-                    g2d.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
-                    g2d.drawString(String.valueOf(8 - y), 3, y * square_height + 20);
+                    g2d.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+                    g2d.drawString(String.valueOf(8 - y), 3, y * square_height + 15);
                 }
                 if (y == 7) {
-                    g2d.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 15));
-                    g2d.drawString(files[x], x * square_width + square_width - 20, y * square_height + square_height - 3);
+                    g2d.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+                    g2d.drawString(files[x], x * square_width + square_width - 17, y * square_height + square_height - 5);
                 }
 
             }
 
-            set_from_fen(curr_fen);
         }
 
-//        set_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
-//        set_from_fen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR");
+        if (curr_click != null) {
+            g2d.setColor(new Color(0x99BC6FFF, true));
+            g2d.fillRect(curr_click.x * square_width, curr_click.y * square_height, square_width, square_height);
+        }
+
+        // Put pieces ont top of the board
+        for (Piece piece : board) {
+            g2d.drawImage(
+                    image_from_piece(piece.id),
+                    piece.file*square_width + 5, piece.rank*square_height + 5,
+                    square_width - 10, square_height - 10,
+                    this
+            );
+        }
     }
 
     //TODO: initialize the board and have the paintcomponent just draw the state of the board
     @Override
     public void actionPerformed(ActionEvent e) {
-        if (curr_fen.equals("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")) {
-            curr_fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR";
+
+    }
+
+    @Override
+    public void mouseClicked(MouseEvent e) {
+        System.out.println("e.getPoint() = " + e.getPoint());
+        Point click = e.getPoint();
+        Point trans_p = new Point(
+                Math.max(Math.floorDiv(click.x, square_width), 0),
+                Math.max(Math.floorDiv(click.y, square_height), 0)
+        );
+        if (trans_p.equals(curr_click)) {
+            curr_click = null;
         } else {
-            curr_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+            curr_click = trans_p;
         }
         repaint();
+    }
+
+    @Override
+    public void mousePressed(MouseEvent e) {
+
+    }
+
+    @Override
+    public void mouseReleased(MouseEvent e) {
+
+    }
+
+    @Override
+    public void mouseEntered(MouseEvent e) {
+
+    }
+
+    @Override
+    public void mouseExited(MouseEvent e) {
+
+    }
+
+    @Override
+    public void mouseDragged(MouseEvent e) {
+
+    }
+
+    @Override
+    public void mouseMoved(MouseEvent e) {
+
     }
 }

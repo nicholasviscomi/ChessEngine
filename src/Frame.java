@@ -35,8 +35,8 @@ public class Frame extends JPanel {
         submit_fen.addActionListener(board);
         submit_fen.setVisible(true);
 
-        frame.add(fen);
-        frame.add(submit_fen);
+//        frame.add(fen);
+//        frame.add(submit_fen);
         frame.add(board);
 
         frame.setVisible(true);
