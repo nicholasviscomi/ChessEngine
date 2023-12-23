@@ -2,6 +2,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 @SuppressWarnings("SpellCheckingInspection")
 public class Board extends JPanel implements ActionListener, MouseListener, MouseMotionListener {
@@ -36,7 +37,8 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
     }
 
     private void init_board() {
-        String fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+//        String fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+        String fen = "rnbqkbnr/pppppppp/4P3/8/8/8/PPPP1PPP/RNBQKBNR";
 
         board = new Piece[8][8];
         int file = 0, rank = 0;
@@ -73,72 +75,49 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
         repaint();
     }
 
-    private void set_gui_from_fen(String fen) {
-        int x = 0;
-        int y = 0;
-        for (char c: fen.toCharArray()) {
-            if (c == '/') {
-                // y ONLY gets incremented here because a backslash is the only thing denoting the
-                // end of the rank in the FEN string
-                x = 0; y += 1;
-                continue;
-            }
+    public ArrayList<Point> get_legal_moves(Piece piece) {
+        ArrayList<Point> moves = new ArrayList<>(); // maximum possible legal moves is 218 is some very obscure position
 
-            // CHAR IS A NUMBER => skip some squares
-            if ((int) c >= 48 && (int) c <= 57) {
-                // 48 is the offset in the ASCII table)
-                int shift = (int) c - 48;
+        int[] pawn_attacks_dx = {1, -1};
+        int[] pawn_attacks_dy = {1,  1};
 
-                if (shift == 8) {
-                    // if it's 8 it shouldn't wrap around. Backslash is what marks the end of the line
-                    x += 7;
-                } else {
-                    x += Math.max(shift, 1); // at minimum needs to move x over by 1
+
+        int x = piece.file, y = piece.rank;
+        switch (piece.id) {
+            // loop through directions for each piece type
+            case 'p', 'P':
+                // to find en passant: when dx==0 and dy==2, look left and righ to see
+                for (int i = 0; i < pawn_attacks_dy.length; i++) {
+                    int dx = pawn_attacks_dx[i]; int dy = pawn_attacks_dy[i];
+                    // multiply by color to search the correct direction
+                    //target x and y coordinates
+                    int ty = y + (dy*piece.color);
+                    int tx = x + (dx*piece.color);
+                    if (ty < 0 || ty > 7 || tx < 0 || tx > 7) continue;
+
+                    Piece target = board[ty][tx];
+                    if (target != null && target.color == (piece.color * -1)) {
+                        moves.add(new Point(x + dx, y + dy));
+                    }
                 }
 
-                continue;
-            }
+                // move one forward if there are no pieces
+                if (board[y + piece.color][x] == null) {
+                    moves.add(new Point(x, y + piece.color));
+                    // double push on first move AND must be nothing blocking
+                    if (piece.has_not_moved && board[y + (2*piece.color)][x] == null) {
+                        moves.add(new Point(x, y + (2*piece.color)));
+                    }
+                }
 
 
-            String path = "";
-            // UPPERCASE => white
-            if ((int) c >= 65 && (int) c <= 90) {
-                path = String.format("src/materials/white/%c.png", c);
-            }
-            // LOWERCASE => black
-            else if ((int) c >= 97 && (int) c <= 122) {
-                path = String.format("src/materials/black/%c.png", c);
-            }
-
-            Image piece = Toolkit.getDefaultToolkit().getImage(path);
-            g2d.drawImage(
-                    piece,
-                    x*square_width + 5, y*square_height + 5, square_width - 10, square_height - 10,
-                    null
-            );
-
-            // AGAIN, only backslashes denote the end of the rank
-            x += 1;
-        }
-        repaint();
-    }
-
-    /*
-    Given Piece.id parameter returns the image
-     */
-    private Image image_from_piece(char c) {
-        String path = null;
-        if ((int) c >= 65 && (int) c <= 90) {
-            path = String.format("src/materials/white/%c.png", c);
-        }
-        // LOWERCASE => black
-        else if ((int) c >= 97 && (int) c <= 122) {
-            path = String.format("src/materials/black/%c.png", c);
+            default:
+                break;
         }
 
-        if (path == null) { System.err.println("PATH WAS NULL: image_from_piece()"); }
+        // handle special moves
 
-        return Toolkit.getDefaultToolkit().getImage(path);
+        return moves;
     }
 
     @Override
@@ -170,16 +149,39 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
                 }
                 if (y == 7) {
                     g2d.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
-                    g2d.drawString(files[x], x * square_width + square_width - 17, y * square_height + square_height - 5);
+                    g2d.drawString(files[x], x * square_width + square_width - 12, y * square_height + square_height - 5);
                 }
 
             }
 
         }
 
+        //TODO: move this code to mouseclicked. This needs to be drawing from a global legal moves variable
+        //TODO: this way mouseclicked will have access to the legal moves and it will be able to know if the
+        //TODO: the user just clicked on one of the legal moves
         if (curr_click != null) {
             g2d.setColor(new Color(0x99BC6FFF, true));
             g2d.fillRect(curr_click.x * square_width, curr_click.y * square_height, square_width, square_height);
+
+            ArrayList<Point> legal_moves = get_legal_moves(board[curr_click.y][curr_click.x]);
+            System.out.println("legal_moves = " + legal_moves);
+            for (Point move : legal_moves) {
+                if (move == null) break;
+                g2d.setColor(new Color(0x99BC6FFF, true));
+                g2d.fillRect(
+                        move.x * square_width, move.y * square_height,
+                        square_width, square_height
+                );
+
+                g2d.setColor(new Color(0xCB000000, true));
+                    g2d.setStroke(new BasicStroke(1));
+                    // black dot over open sqaure to move to
+                    g2d.fillOval(
+                            move.x*square_width + square_width/2 - 10,
+                            move.y*square_height + square_height/2 - 10,
+                            20, 20
+                    );
+            }
         }
 
         // Put pieces ont top of the board
@@ -187,7 +189,7 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
             for (Piece piece : rank) {
                 if (piece == null) continue;
                 g2d.drawImage(
-                        image_from_piece(piece.id),
+                        piece.get_image(piece.id),
                         piece.file*square_width + 5, piece.rank*square_height + 5,
                         square_width - 10, square_height - 10,
                         this
