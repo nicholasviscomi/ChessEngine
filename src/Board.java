@@ -8,7 +8,7 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
     int square_width = 75, square_height = 75;
     Frame parent;
     private Graphics2D g2d;
-    private ArrayList<Piece> board;
+    private Piece[][] board;
     private Point curr_click;
     Board(int parent_width, int parent_height, Frame parent) {
         setLocation((parent_width - square_width*8)/2, (parent_height-square_height*8)/2 - 10);
@@ -38,7 +38,7 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
     private void init_board() {
         String fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
 
-        board = new ArrayList<>();
+        board = new Piece[8][8];
         int file = 0, rank = 0;
         for (char c: fen.toCharArray()) {
             if (c == '/') {
@@ -66,7 +66,7 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
             else if ((int) c >= 97 && (int) c <= 122) { color = Piece.BLACK; }
 
             Piece piece = new Piece(rank, file, c, color);
-            board.add(piece);
+            board[rank][file] = piece;
 
             file += 1;
         }
@@ -183,13 +183,16 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
         }
 
         // Put pieces ont top of the board
-        for (Piece piece : board) {
-            g2d.drawImage(
-                    image_from_piece(piece.id),
-                    piece.file*square_width + 5, piece.rank*square_height + 5,
-                    square_width - 10, square_height - 10,
-                    this
-            );
+        for (Piece[] rank : board) {
+            for (Piece piece : rank) {
+                if (piece == null) continue;
+                g2d.drawImage(
+                        image_from_piece(piece.id),
+                        piece.file*square_width + 5, piece.rank*square_height + 5,
+                        square_width - 10, square_height - 10,
+                        this
+                );
+            }
         }
     }
 
@@ -201,17 +204,26 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
 
     @Override
     public void mouseClicked(MouseEvent e) {
-        System.out.println("e.getPoint() = " + e.getPoint());
+        // Handle clicking on a piece
         Point click = e.getPoint();
         Point trans_p = new Point(
                 Math.max(Math.floorDiv(click.x, square_width), 0),
                 Math.max(Math.floorDiv(click.y, square_height), 0)
         );
-        if (trans_p.equals(curr_click)) {
+
+        // if there is no piece reset the square
+        if (board[trans_p.y][trans_p.x] == null) {
             curr_click = null;
         } else {
-            curr_click = trans_p;
+            if (trans_p.equals(curr_click)) {
+                // clicked on same piece --> clear the highlighted square
+                curr_click = null;
+            } else {
+                // clicked on new piece --> update highlight
+                curr_click = trans_p;
+            }
         }
+
         repaint();
     }
 
