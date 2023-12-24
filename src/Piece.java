@@ -31,6 +31,10 @@ public class Piece {
         return Toolkit.getDefaultToolkit().getImage(path);
     }
 
+    public Point get_point() {
+        return new Point(file, rank);
+    }
+
     //NOTE: only moves the piece in code; the board must be updated for it to be seen
     public void move(Point target) {
         this.rank = target.y;

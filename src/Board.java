@@ -11,6 +11,7 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
     private Graphics2D g2d;
     private Piece[][] board;
     private Point curr_click;
+    private Piece selected_piece = null;
     Board(int parent_width, int parent_height, Frame parent) {
         setLocation((parent_width - square_width*8)/2, (parent_height-square_height*8)/2 - 10);
         setSize(square_width * 8, square_height * 8);
@@ -37,8 +38,8 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
     }
 
     private void init_board() {
-//        String fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
-        String fen = "rnbqkbnr/pppppppp/4P3/8/8/8/PPPP1PPP/RNBQKBNR";
+        String fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+//        String fen = "rnbqkbnr/ppp1pppp/4P3/8/8/3p4/PPPP1PPP/RNBQKBNR";
 
         board = new Piece[8][8];
         int file = 0, rank = 0;
@@ -97,7 +98,7 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
 
                     Piece target = board[ty][tx];
                     if (target != null && target.color == (piece.color * -1)) {
-                        moves.add(new Point(x + dx, y + dy));
+                        moves.add(new Point(tx, ty));
                     }
                 }
 
@@ -163,24 +164,25 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
             g2d.setColor(new Color(0x99BC6FFF, true));
             g2d.fillRect(curr_click.x * square_width, curr_click.y * square_height, square_width, square_height);
 
-            ArrayList<Point> legal_moves = get_legal_moves(board[curr_click.y][curr_click.x]);
-            System.out.println("legal_moves = " + legal_moves);
-            for (Point move : legal_moves) {
-                if (move == null) break;
-                g2d.setColor(new Color(0x99BC6FFF, true));
-                g2d.fillRect(
-                        move.x * square_width, move.y * square_height,
-                        square_width, square_height
-                );
+            if (selected_piece != null) {
+                ArrayList<Point> legal_moves = get_legal_moves(selected_piece);
+                for (Point move : legal_moves) {
+                    if (move == null) break;
+                    g2d.setColor(new Color(0x99BC6FFF, true));
+                    g2d.fillRect(
+                            move.x * square_width, move.y * square_height,
+                            square_width, square_height
+                    );
 
-                g2d.setColor(new Color(0xCB000000, true));
+                    g2d.setColor(new Color(0xCB000000, true));
                     g2d.setStroke(new BasicStroke(1));
-                    // black dot over open sqaure to move to
+                    // black dot over sqaure to move to
                     g2d.fillOval(
                             move.x*square_width + square_width/2 - 10,
                             move.y*square_height + square_height/2 - 10,
                             20, 20
                     );
+                }
             }
         }
 
@@ -198,12 +200,32 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
         }
     }
 
-    //TODO: initialize the board and have the paintcomponent just draw the state of the board
     @Override
     public void actionPerformed(ActionEvent e) {
 
     }
 
+    public void move_piece(Point from, Point to) {
+        board[to.y][to.x] = board[from.y][from.x];
+        board[from.y][from.x] = null;
+
+        board[to.y][to.x].move(to);
+    }
+
+    private void print_board() {
+        for (Piece[] rank : board) {
+            for (Piece piece : rank) {
+                if (piece == null) {
+                    System.out.print("x");
+                }
+                else {
+                    System.out.print(piece.id);
+                }
+            }
+            System.out.println();
+        }
+        System.out.println();
+    }
     @Override
     public void mouseClicked(MouseEvent e) {
         // Handle clicking on a piece
@@ -213,16 +235,35 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
                 Math.max(Math.floorDiv(click.y, square_height), 0)
         );
 
+        // check to see if a move should be made
+        if (selected_piece != null) {
+            for (Point move : get_legal_moves(selected_piece)) {
+                if (trans_p.equals(move)) {
+                    print_board();
+                    move_piece(selected_piece.get_point(), move);
+                    print_board();
+
+                    curr_click = null;
+                    selected_piece = null;
+                    repaint();
+                    return;
+                }
+            }
+        }
+
         // if there is no piece reset the square
         if (board[trans_p.y][trans_p.x] == null) {
             curr_click = null;
+            selected_piece = null;
         } else {
             if (trans_p.equals(curr_click)) {
                 // clicked on same piece --> clear the highlighted square
                 curr_click = null;
+                selected_piece = null;
             } else {
                 // clicked on new piece --> update highlight
                 curr_click = trans_p;
+                selected_piece = board[trans_p.y][trans_p.x];
             }
         }
 
