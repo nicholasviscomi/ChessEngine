@@ -323,6 +323,11 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
     }
     @Override
     public void mouseClicked(MouseEvent e) {
+
+    }
+
+    @Override
+    public void mousePressed(MouseEvent e) {
         // Handle clicking on a piece
         Point click = e.getPoint();
         Point trans_p = new Point(
@@ -365,11 +370,6 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
         }
 
         repaint();
-    }
-
-    @Override
-    public void mousePressed(MouseEvent e) {
-
     }
 
     @Override
