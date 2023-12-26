@@ -32,7 +32,6 @@ public class Frame extends JPanel {
         JButton submit_fen = new JButton("submit");
         d = submit_fen.getPreferredSize();
         submit_fen.setBounds(fen.getX() + fen.getWidth() + 5, 10, d.width, 20);
-        submit_fen.addActionListener(board);
         submit_fen.setVisible(true);
 
 //        frame.add(fen);

@@ -2,10 +2,11 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 @SuppressWarnings("SpellCheckingInspection")
-public class Board extends JPanel implements ActionListener, MouseListener, MouseMotionListener {
+public class Board extends JPanel implements MouseListener, MouseMotionListener {
     int square_width = 75, square_height = 75;
     Frame parent;
     private Graphics2D g2d;
@@ -13,6 +14,9 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
     private Point curr_click;
     private Piece selected_piece = null;
     private int side_to_move = Piece.WHITE;
+
+    private HashMap<Character, Point> piece_map = new HashMap<>();
+    private HashMap<Character, Point> test_piece_map = new HashMap<>();
 
     Board(int parent_width, int parent_height, Frame parent) {
         setLocation((parent_width - square_width*8)/2, (parent_height-square_height*8)/2 - 10);
@@ -27,16 +31,6 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
         addMouseListener(this);
         addMouseMotionListener(this);
         setVisible(true);
-    }
-
-    /*
-    Given a 0-indexed rank and file number starting the count from top left
-    will return the square coordinates as referred to in chess
-    E.x. 0,0 --> a8
-     */
-    private String get_square_coord(int rank, int file) {
-        String[] files = new String[] {"a", "b", "c", "d", "e", "f", "g", "h"};
-        return String.format(files[file] + "%d", 8 - rank);
     }
 
     private void init_board() {
@@ -72,17 +66,111 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
 
             Piece piece = new Piece(rank, file, c, color);
             board[rank][file] = piece;
+            piece_map.put(c, piece.get_point());
 
             file += 1;
         }
         repaint();
     }
 
-    public boolean king_in_check() {
+
+
+    private Piece piece_from_id(Piece[][] board, char id) {
+        return board[piece_map.get(id).y][piece_map.get(id).x];
+    }
+
+    public boolean king_in_check(Piece[][] board) {
+        /*
+        Expand out from king in all possible directions to see if it's being attacked
+        * Uses a given board (so this code can be used to check whether a move is legal)
+         */
+
+        Piece piece = piece_from_id(board, side_to_move == Piece.WHITE ? 'K' : 'k');
+        int y = piece.rank;
+        int x = piece.file;
+
+        int[] knight_dy =   {2,  2, 1, -1,  1, -1, -2, -2};
+        int[] knight_dx =   {1, -1, 2,  2, -2, -2,  1, -1};
+        int[] rook_dx   =   {1, -1, 0,  0};
+        int[] rook_dy   =   {0,  0, 1, -1};
+        int[] bishop_dx =   {1,  1, -1, -1};
+        int[] bishop_dy =   {1, -1,  1, -1};
+        int[] pawn_dx   =   {1, -1};
+        int[] pawn_dy   =   {1,  1};
+
+        int[][] all_dy = {
+                knight_dy, rook_dy, bishop_dy, pawn_dx
+        };
+        int[][] all_dx = {
+                knight_dx, rook_dx, bishop_dx, pawn_dy
+        };
+
+        for (int i = 0; i < all_dy.length; i++) {
+            int [] dys = all_dy[i], dxs = all_dx[i];
+            for (int j = 0; j < dys.length; j++) {
+                int dx = dxs[j];
+                int dy = dys[j];
+
+                int scale = 1;
+                while (true) {
+                    //target x and y
+                    int ty = y + (dy * piece.color * scale);
+                    int tx = x + (dx * piece.color * scale); // multiply by color to search the correct direction
+
+                    // if off the screen break
+                    if (ty < 0 || ty > 7 || tx < 0 || tx > 7) break;
+
+                    Piece target = board[ty][tx];
+                    if (target != null) { // square is open
+                        if (target.color == (piece.color * -1)) { // opposite color piece
+                            switch (i) {
+                                case 0 -> {
+                                    // there is an opposite colored knight attacking the king
+                                    if (
+                                            Character.toLowerCase(target.id) == 'n'
+                                    ) return true;
+                                }
+                                case 1 -> {
+                                    // opposite colored rook or queen attacking the king
+                                    if (
+                                            Character.toLowerCase(target.id) == 'r' ||
+                                            Character.toLowerCase(target.id) == 'q'
+                                    ) return true;
+                                }
+                                case 2 -> {
+                                    // opposite colored bishop or queen attacking the king
+                                    if (
+                                            Character.toLowerCase(target.id) == 'b' ||
+                                            Character.toLowerCase(target.id) == 'q'
+                                    ) return true;
+                                }
+                                case 3 -> {
+                                    // pawn attacking the king
+                                    if (
+                                            Character.toLowerCase(target.id) == 'p'
+                                    ) return true;
+                                }
+                            }
+                        }
+
+                        // hit a piece --> no more searching this direction
+                        break;
+                    }
+
+                    if (i == 0 || i == 3)
+                        break; // looking at knight or pawn moves; don't reiterate
+
+                    scale += 1;
+                }
+            }
+
+
+        }
+
         return false;
     }
 
-    public ArrayList<Point> sliding_piece_moves(int[] piece_dx, int[] piece_dy, Piece piece) {
+    public ArrayList<Point> get_sliding_piece_moves(int[] piece_dx, int[] piece_dy, Piece piece, boolean early_exit) {
         int y = piece.rank;
         int x = piece.file;
         ArrayList<Point> moves = new ArrayList<>();
@@ -95,8 +183,8 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
             while (true) {
                 int ty = y + (dy * piece.color * scale);
                 int tx = x + (dx * piece.color * scale); // multiply by color to search the correct direction
-
                 if (ty < 0 || ty > 7 || tx < 0 || tx > 7) break;
+                Point tpoint = new Point(tx, ty);
 
                 Piece target = board[ty][tx];
                 if (target == null) { // square is open
@@ -104,11 +192,15 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
                 } else {
                     if (target.color == (piece.color * -1)) {
                         // add capture to moves and then break
-                        moves.add(new Point(tx, ty));
+                        if (!king_in_check(test_move_piece(piece.get_point(), tpoint))) {
+                            moves.add(tpoint);
+                        }
                     }
                     // hit a piece --> no more searching this direction
                     break;
                 }
+
+                if (early_exit) break;
 
                 scale += 1;
             }
@@ -136,21 +228,31 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
                     int ty = y + (dy * piece.color);
                     int tx = x + (dx * piece.color);
                     if (ty < 0 || ty > 7 || tx < 0 || tx > 7) continue;
+                    Point tpoint = new Point(tx, ty);
 
                     Piece target = board[ty][tx];
                     if (target != null && target.color == (piece.color * -1)) {
-                        moves.add(new Point(tx, ty));
+                        if (!king_in_check(test_move_piece(piece.get_point(), tpoint))) {
+                            moves.add(tpoint);
+                        }
                     }
                 }
 
                 // move one forward if there are no pieces
                 if (board[y + piece.color][x] == null) {
-                    moves.add(new Point(x, y + piece.color));
+                    Point tpoint = new Point(x, y + piece.color);
+                    if (!king_in_check(test_move_piece(piece.get_point(), tpoint))) {
+                        moves.add(tpoint);
+                    }
                     // double push on first move AND must be nothing blocking
                     if (piece.has_not_moved && board[y + (2 * piece.color)][x] == null) {
-                        moves.add(new Point(x, y + (2 * piece.color)));
+                        tpoint = new Point(x, y + (2 * piece.color));
+                        if (!king_in_check(test_move_piece(piece.get_point(), tpoint))) {
+                            moves.add(tpoint);
+                        }
                     }
                 }
+
             }
             case 'n', 'N' -> {
                 int[] knight_dy = {2, 2, 1, -1, 1, -1, -2, -2};
@@ -163,11 +265,15 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
                     int ty = y + (dy * piece.color);
                     int tx = x + (dx * piece.color);
                     if (ty < 0 || ty > 7 || tx < 0 || tx > 7) continue;
+                    Point tpoint = new Point(tx, ty);
 
                     Piece target = board[ty][tx];
                     if (target == null || target.color == (piece.color * -1)) {
                         // add move if square is open or can capture it
-                        moves.add(new Point(tx, ty));
+                        // and move does NOT put king in check
+                        if (!king_in_check(test_move_piece(piece.get_point(), tpoint))) {
+                            moves.add(tpoint);
+                        }
                     }
                 }
             }
@@ -182,22 +288,26 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
                     int ty = y + (dy * piece.color);
                     int tx = x + (dx * piece.color);
                     if (ty < 0 || ty > 7 || tx < 0 || tx > 7) continue;
+                    Point tpoint = new Point(tx, ty);
 
                     Piece target = board[ty][tx];
-                    if (target != null && target.color == (piece.color * -1)) {
-                        moves.add(new Point(tx, ty));
+                    if (target == null || target.color == (piece.color * -1)) { // square is open or can capture it
+                        // and move does NOT put king in check
+                        if (!king_in_check(test_move_piece(piece.get_point(), tpoint))) {
+                            moves.add(tpoint);
+                        }
                     }
                 }
             }
             case 'r', 'R' -> {
                 int[] rook_dx = {1, -1, 0, 0};
                 int[] rook_dy = {0, 0, 1, -1};
-                moves.addAll(sliding_piece_moves(rook_dx, rook_dy, piece));
+                moves.addAll(get_sliding_piece_moves(rook_dx, rook_dy, piece, false));
             }
             case 'b', 'B' -> {
                 int[] bishop_dx = {1,  1, -1, -1};
                 int[] bishop_dy = {1, -1,  1, -1};
-                moves.addAll(sliding_piece_moves(bishop_dx, bishop_dy, piece));
+                moves.addAll(get_sliding_piece_moves(bishop_dx, bishop_dy, piece, false));
             }
             case 'q', 'Q' -> {
                 int[] rook_dx = {1, -1, 0, 0};
@@ -205,13 +315,11 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
                 int[] bishop_dx = {1,  1, -1, -1};
                 int[] bishop_dy = {1, -1,  1, -1};
 
-                moves.addAll(sliding_piece_moves(rook_dx, rook_dy, piece));
-                moves.addAll(sliding_piece_moves(bishop_dx, bishop_dy, piece));
+                moves.addAll(get_sliding_piece_moves(rook_dx, rook_dy, piece, false));
+                moves.addAll(get_sliding_piece_moves(bishop_dx, bishop_dy, piece, false));
             }
             default -> {}
         }
-
-        // handle special moves
 
         return moves;
     }
@@ -295,16 +403,35 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
         }
     }
 
-    @Override
-    public void actionPerformed(ActionEvent e) {
-
-    }
-
-    public void move_piece(Point from, Point to) {
+    public void move_piece_in_place(Point from, Point to) {
         board[to.y][to.x] = board[from.y][from.x];
         board[from.y][from.x] = null;
 
         board[to.y][to.x].move(to);
+        piece_map.replace(board[to.y][to.x].id, to);
+    }
+
+    public Piece[][] test_move_piece(Point from, Point to) {
+        Piece[][] copy_board = new Piece[8][8];
+
+        for (int i = 0; i < board.length; i++) {
+            Piece[] row = board[i];
+            for (int j = 0; j < row.length; j++) {
+                if (row[j] == null) {
+                    copy_board[i][j] = null;
+                } else {
+                    Piece p = new Piece(row[j]);
+                    copy_board[i][j] = p;
+                }
+            }
+        }
+
+        copy_board[to.y][to.x] = copy_board[from.y][from.x];
+        copy_board[from.y][from.x] = null;
+
+        copy_board[to.y][to.x].move(to);
+
+        return copy_board;
     }
 
     private void print_board() {
@@ -322,11 +449,6 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
         System.out.println();
     }
     @Override
-    public void mouseClicked(MouseEvent e) {
-
-    }
-
-    @Override
     public void mousePressed(MouseEvent e) {
         // Handle clicking on a piece
         Point click = e.getPoint();
@@ -339,7 +461,7 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
         if (selected_piece != null) {
             for (Point move : get_legal_moves(selected_piece)) {
                 if (trans_p.equals(move)) {
-                    move_piece(selected_piece.get_point(), move);
+                    move_piece_in_place(selected_piece.get_point(), move);
 
                     curr_click = null;
                     selected_piece = null;
@@ -370,6 +492,11 @@ public class Board extends JPanel implements ActionListener, MouseListener, Mous
         }
 
         repaint();
+    }
+
+    @Override
+    public void mouseClicked(MouseEvent e) {
+
     }
 
     @Override

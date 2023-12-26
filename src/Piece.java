@@ -8,6 +8,14 @@ public class Piece {
     int color;
     boolean has_not_moved;
     boolean open_to_en_passant = false;
+    boolean in_check = false;
+
+    Piece(Piece piece) {
+        this.rank = piece.rank;
+        this.file = piece.file;
+        this.id = piece.id;
+        this.color = piece.color;
+    }
 
     Piece(int rank, int file, char id, int color) {
         this.rank = rank;
