@@ -5,16 +5,22 @@ public class Piece {
     public static final int BLACK = 1;
     int rank, file;
     char id;
+
+    // also functions as a way to determine which direction the pieces are moving on in terms
+    // of the indices of the Piece[][] board variable
     int color;
     boolean has_not_moved;
     boolean open_to_en_passant = false;
-    boolean in_check = false;
+    boolean has_castling_rights = false;
 
     Piece(Piece piece) {
         this.rank = piece.rank;
         this.file = piece.file;
         this.id = piece.id;
         this.color = piece.color;
+        this.open_to_en_passant = piece.open_to_en_passant;
+        this.has_not_moved = piece.has_not_moved;
+        this.has_castling_rights = piece.has_castling_rights;
     }
 
     Piece(int rank, int file, char id, int color) {
