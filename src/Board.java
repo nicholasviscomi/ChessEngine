@@ -3,7 +3,6 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Map;
 
 @SuppressWarnings("SpellCheckingInspection")
 public class Board extends JPanel implements MouseListener, MouseMotionListener {
@@ -170,7 +169,12 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
         return false;
     }
 
-    public ArrayList<Point> get_sliding_piece_moves(int[] piece_dx, int[] piece_dy, Piece piece, boolean early_exit) {
+    /*
+    - Given the moves a piece can make (as described by the dx and dy params) it returns the legal moves
+    - If early exit is false, it will search the entire board for the given direction vectors
+        - making it true allows support for knights, who have more limited mobility
+     */
+    public ArrayList<Point> get_piece_moves(int[] piece_dx, int[] piece_dy, Piece piece, boolean early_exit) {
         int y = piece.rank;
         int x = piece.file;
         ArrayList<Point> moves = new ArrayList<>();
@@ -284,25 +288,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
             case 'n', 'N' -> {
                 int[] knight_dy = {2, 2, 1, -1, 1, -1, -2, -2};
                 int[] knight_dx = {1, -1, 2, 2, -2, -2, 1, -1};
-                for (int i = 0; i < knight_dx.length; i++) {
-                    int dx = knight_dx[i];
-                    int dy = knight_dy[i];
-                    // multiply by color to search the correct direction
-                    //target x and y coordinates
-                    int ty = y + (dy * piece.color);
-                    int tx = x + (dx * piece.color);
-                    if (ty < 0 || ty > 7 || tx < 0 || tx > 7) continue;
-                    Point tpoint = new Point(tx, ty);
-
-                    Piece target = board[ty][tx];
-                    if (target == null || target.color == (piece.color * -1)) {
-                        // add move if square is open or can capture it
-                        // and move does NOT put king in check
-                        if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map)) {
-                            moves.add(tpoint);
-                        }
-                    }
-                }
+                moves.addAll(get_piece_moves(knight_dx, knight_dy, piece, true));
             }
             case 'k', 'K' -> {
                 int[] king_dx = {0, 1, 0, -1, 1, 1, -1, -1};
@@ -329,12 +315,12 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
             case 'r', 'R' -> {
                 int[] rook_dx = {1, -1, 0, 0};
                 int[] rook_dy = {0, 0, 1, -1};
-                moves.addAll(get_sliding_piece_moves(rook_dx, rook_dy, piece, false));
+                moves.addAll(get_piece_moves(rook_dx, rook_dy, piece, false));
             }
             case 'b', 'B' -> {
                 int[] bishop_dx = {1,  1, -1, -1};
                 int[] bishop_dy = {1, -1,  1, -1};
-                moves.addAll(get_sliding_piece_moves(bishop_dx, bishop_dy, piece, false));
+                moves.addAll(get_piece_moves(bishop_dx, bishop_dy, piece, false));
             }
             case 'q', 'Q' -> {
                 int[] rook_dx = {1, -1, 0, 0};
@@ -342,8 +328,8 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                 int[] bishop_dx = {1,  1, -1, -1};
                 int[] bishop_dy = {1, -1,  1, -1};
 
-                moves.addAll(get_sliding_piece_moves(rook_dx, rook_dy, piece, false));
-                moves.addAll(get_sliding_piece_moves(bishop_dx, bishop_dy, piece, false));
+                moves.addAll(get_piece_moves(rook_dx, rook_dy, piece, false));
+                moves.addAll(get_piece_moves(bishop_dx, bishop_dy, piece, false));
             }
             default -> {}
         }
