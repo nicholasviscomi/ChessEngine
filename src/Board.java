@@ -188,44 +188,42 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                 Point tpoint = new Point(tx, ty);
                 Piece target = board[ty][tx];
 
-                // if king is in check only look for moves that remove it from check
+
+                boolean stops_check = false;
                 if (in_check) {
-                    boolean stops_check = !king_in_check(
+                    stops_check = !king_in_check(
                             test_move_piece(piece.get_point(), tpoint),
                             test_piece_map
                     );
+                }
 
-                    if (target == null) { // square is open
-                        if (stops_check) { // and stops the check
-                            moves.add(new Point(tx, ty));
-                            break;
+
+                if (target == null) { // square is open
+                    if (in_check) {
+                        if (stops_check) {
+                            moves.add(tpoint);
+                            // only a knight can block a check in multiple ways
+                            if (Character.toLowerCase(piece.id) != 'n') break;
                         }
                     } else {
-                        if (target.color == (piece.color * -1)) { // can be captured
+                        moves.add(tpoint);
+                    }
+                } else {
+                    if (target.color == (piece.color * -1)) {
+                        if (in_check) {
                             if (stops_check) {
                                 moves.add(tpoint);
+                                if (Character.toLowerCase(piece.id) != 'n') break;
                             }
                         }
-                        // hit a piece --> no more searching this direction
-                        break;
-                    }
 
-                    scale += 1;
-                    continue;
-                } else {
-                    // king not currently in check
-                    if (target == null) { // square is open
-                        moves.add(new Point(tx, ty));
-                    } else {
-                        if (target.color == (piece.color * -1)) {
-                            // ensure this move doesn't put king in check
-                            if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map)) {
-                                moves.add(tpoint);
-                            }
+                        // ensure this move doesn't put king in check
+                        if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map)) {
+                            moves.add(tpoint);
                         }
-                        // hit a piece --> no more searching this direction
-                        break;
                     }
+                    // hit a piece --> no more searching this direction
+                    break;
                 }
 
 
