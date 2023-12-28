@@ -82,13 +82,13 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
         return board[piece_map.get(id).y][piece_map.get(id).x];
     }
 
-    public boolean king_in_check(Piece[][] board, HashMap<Character, Point> map) {
+    public boolean king_in_check(Piece[][] board, HashMap<Character, Point> map, int king_side) {
         /*
         Expand out from king in all possible directions to see if it's being attacked
         * Uses a given board (so this code can be used to check whether a move is legal)
          */
 
-        Piece king = piece_from_id(board, map, side_to_move == Piece.WHITE ? 'K' : 'k');
+        Piece king = piece_from_id(board, map, king_side == Piece.WHITE ? 'K' : 'k');
         int y = king.rank;
         int x = king.file;
 
@@ -182,7 +182,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
         int y = piece.rank;
         int x = piece.file;
         ArrayList<Move> moves = new ArrayList<>();
-        boolean in_check = king_in_check(board, piece_map);
+        boolean in_check = king_in_check(board, piece_map, side_to_move);
 
         for (int i = 0; i < piece_dx.length; i++) {
             int dx = piece_dx[i];
@@ -201,7 +201,8 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                 if (in_check) {
                     stops_check = !king_in_check(
                             test_move_piece(piece.get_point(), tpoint),
-                            test_piece_map
+                            test_piece_map,
+                            side_to_move
                     );
                 }
 
@@ -227,7 +228,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                         }
 
                         // ensure this move doesn't put king in check
-                        if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map)) {
+                        if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map, side_to_move)) {
                             moves.add(new Move(piece, piece.get_point(), tpoint));
                         }
                     }
@@ -249,7 +250,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
     public ArrayList<Move> get_legal_moves(Piece piece) {
         ArrayList<Move> moves = new ArrayList<>();
 
-        boolean in_check = king_in_check(board, piece_map);
+        boolean in_check = king_in_check(board, piece_map, side_to_move);
 
         int x = piece.file, y = piece.rank;
         switch (piece.id) {
@@ -274,14 +275,15 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                             // if king is in check, only add moves which stop it
                             boolean stops_check = !king_in_check(
                                     test_move_piece(piece.get_point(), tpoint),
-                                    test_piece_map
+                                    test_piece_map,
+                                    side_to_move
                             );
                             if (stops_check) {
                                 moves.add(new Move(piece, piece.get_point(), tpoint));
                             }
                         } else {
                             // if king is not in check, add moves which don't put him in check
-                            if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map)) {
+                            if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map, side_to_move)) {
                                 moves.add(new Move(piece, piece.get_point(), tpoint));
                             }
                         }
@@ -305,7 +307,8 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                             if (in_check) {
                                 boolean stops_check = !king_in_check(
                                         test_move_piece(piece.get_point(), tpoint),
-                                        test_piece_map
+                                        test_piece_map,
+                                        side_to_move
                                 );
                                 if (stops_check) {
                                     moves.add(new Move(piece, piece.get_point(), tpoint, board[y][tx]));
@@ -313,7 +316,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                             } else {
                                 // doesn't put king in check
                                 // run this last because it's the most computationally intensive
-                                if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map)) {
+                                if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map, side_to_move)) {
                                     moves.add(
                                             new Move(piece, piece.get_point(), tpoint, board[y][tx])
                                     );
@@ -330,13 +333,14 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                     if (in_check) {
                         boolean stops_check = !king_in_check(
                                 test_move_piece(piece.get_point(), tpoint),
-                                test_piece_map
+                                test_piece_map,
+                                side_to_move
                         );
                         if (stops_check) {
                             moves.add(new Move(piece, piece.get_point(), tpoint));
                         }
                     } else {
-                        if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map)) {
+                        if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map, side_to_move)) {
                             moves.add(new Move(piece, piece.get_point(), tpoint));
                         }
                     }
@@ -347,13 +351,14 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                         if (in_check) {
                             boolean stops_check = !king_in_check(
                                     test_move_piece(piece.get_point(), tpoint),
-                                    test_piece_map
+                                    test_piece_map,
+                                    side_to_move
                             );
                             if (stops_check) {
                                 moves.add(new Move(piece, piece.get_point(), tpoint));
                             }
                         } else {
-                            if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map)) {
+                            if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map, side_to_move)) {
                                 moves.add(new Move(piece, piece.get_point(), tpoint));
                             }
                         }
@@ -377,7 +382,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                     Piece target = board[ty][tx];
                     if (target == null || target.color == (piece.color * -1)) { // square is open or can capture it
                         // and move does NOT put king in check
-                        if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map)) {
+                        if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map, side_to_move)) {
                             moves.add(new Move(piece, piece.get_point(), tpoint));
                         }
                     }
@@ -600,6 +605,18 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
         if (selected_piece != null) {
             for (Move move : get_legal_moves(selected_piece)) {
                 if (trans_p.equals(move.to)) {
+
+                    if (king_in_check(test_move_piece(move.from, move.to), test_piece_map, side_to_move * -1)) {
+                        play_sound("materials/audio/check.wav");
+                    } else if (board[move.to.y][move.to.x] != null) {
+                        // piece is being captured
+                        play_sound("materials/audio/piece-capture.wav");
+
+                    } else {
+                        // regular move
+                        play_sound("materials/audio/piece-move.wav");
+                    }
+
                     move_piece_in_place(move);
 
                     curr_click = null;
