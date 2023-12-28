@@ -577,6 +577,10 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                 // pawn moved forward twice
                 board[move.to.y][move.to.x].open_to_en_passant = true;
             }
+
+            if (move.to.y == 0 || move.to.y == 7) {
+                move.piece.promote();
+            }
         }
     }
 

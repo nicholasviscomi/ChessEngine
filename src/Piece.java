@@ -31,6 +31,10 @@ public class Piece {
         this.has_not_moved = true;
     }
 
+    public void promote() {
+        this.id = this.color == WHITE ? 'Q' : 'q';
+    }
+
     public Image get_image(char c) {
         String path = null;
         if ((int) c >= 65 && (int) c <= 90) {
