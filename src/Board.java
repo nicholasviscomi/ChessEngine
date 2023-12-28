@@ -76,12 +76,14 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
         repaint();
     }
 
-
-
     private Piece piece_from_id(Piece[][] board, HashMap<Character, Point> piece_map, char id) {
         return board[piece_map.get(id).y][piece_map.get(id).x];
     }
 
+    /*
+    Exapnds out from the given king in every possible attacking direction. If a piece of the correct type
+    is present, that means the king is being attacked
+     */
     public boolean king_in_check(Piece[][] board, HashMap<Character, Point> map, int king_side) {
         /*
         Expand out from king in all possible directions to see if it's being attacked
@@ -428,7 +430,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
 
         String[] files = new String[] {"A", "B", "C", "D", "E", "F", "G", "H"};
         Color light_square = new Color(231, 214, 185);
-        Color dark_square = new Color(171, 138, 109);
+        Color dark_square = new Color(115, 109, 171);
         for (int y = 0; y < 8; y++) {
             for (int x = 0; x < 8; x++) {
                 if ((y + x) % 2 == 0) {
@@ -458,7 +460,9 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
         }
 
         if (curr_click != null) {
-            g2d.setColor(new Color(0x7C00FFF7, true));
+            g2d.setColor(light_square);
+            g2d.fillRect(curr_click.x * square_width, curr_click.y * square_height, square_width, square_height);
+            g2d.setColor(new Color(0x7CFF3131, true));
             g2d.fillRect(curr_click.x * square_width, curr_click.y * square_height, square_width, square_height);
 
             if (selected_piece != null) {
@@ -610,6 +614,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
             for (Move move : get_legal_moves(selected_piece)) {
                 if (trans_p.equals(move.to)) {
 
+                    // need to specify here that the opposite king should be searched and not the side_to_move king
                     if (king_in_check(test_move_piece(move.from, move.to), test_piece_map, side_to_move * -1)) {
                         play_sound("materials/audio/check.wav");
                     } else if (board[move.to.y][move.to.x] != null) {
