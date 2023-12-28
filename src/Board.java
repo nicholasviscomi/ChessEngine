@@ -18,8 +18,8 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
     private Piece selected_piece = null;
     private int side_to_move = Piece.WHITE;
 
-    private HashMap<Character, Point> piece_map = new HashMap<>();
-    private HashMap<Character, Point> test_piece_map = new HashMap<>();
+    private final HashMap<Character, Point> piece_map = new HashMap<>();
+    private final HashMap<Character, Point> test_piece_map = new HashMap<>();
 
     Board(int parent_width, int parent_height, Frame parent) {
         setLocation((parent_width - square_width*8)/2, (parent_height-square_height*8)/2 - 10);
@@ -391,6 +391,71 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                 }
 
                 // Castling
+                /*
+                If (
+                 king has not moved
+                 && (rooks in corner && have not moved)
+                 && no pieces in between
+                 && not in check
+                 && not in check by castling
+                ) { castle() }
+                 */
+
+                if (!in_check && piece.has_not_moved) {
+                    int x_ = 0;
+                    while (x_ <= 7) {
+                        Piece p = board[piece.rank][x_];
+                        if (p != null) {
+                            System.out.println("p.id = " + p.id);
+                            System.out.println("p.get_point() = " + p.get_point());
+
+                            // if the piece is not == (either rook or king)
+                            // parantheses are cruicial!
+                            if (!(Character.toLowerCase(p.id) == 'r' || Character.toLowerCase(p.id) == 'k')) {
+                                // if there are any non-rook or king pieces on the back rank, castling not available
+                                // on this side --> check the other one
+                                if (x_ < piece.file) {
+                                    x_ = piece.file + 1;
+                                    continue;
+                                } else { break; }
+
+                            } else  {
+                                if (!p.has_not_moved) {
+                                    // only rooks and kings, but the rooks have already moved, so castling unavailable
+                                    System.out.println("pieces have already moved");
+                                    if (x_ < piece.file) {
+                                        x_ = piece.file + 1;
+                                        continue;
+                                    } else { break; }
+                                }
+                            }
+                        }
+
+
+                        if (x_ >= 2 && x <= 6 && x_ != 4) {
+                            // these x coordinatres are all the possible places where the king will move
+                            // --> must check whether moving there will put him in check (if so, invalid)
+                            Point tpoint = new Point(x_, piece.rank);
+                            if (king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map, side_to_move)) {
+                                System.out.println("can't castle through check");
+                                if (x_ < piece.file) {
+                                    x_ = piece.file + 1;
+                                    continue;
+                                } else { break; }
+                            }
+                        }
+
+                        x_++;
+
+                        // after checking the rook on the last file, add the move if everything is ok
+                        // x_ was incremented so it will be 8 if everything is valid, and not 7 (ends the while loop)
+                        if (x_ == piece.file || x_ == 8) {
+                            // if either of these points are reached, that side castling is eligible
+                            int dir = x_ == piece.file ? -1 : 1;
+                            moves.add(new Move(piece, piece.get_point(), new Point(piece.file + 2*dir, piece.rank)));
+                        }
+                    }
+                }
 
             }
             case 'n', 'N' -> {
@@ -478,7 +543,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
 
                     // draw dot on legal moves
                     if (board[move.to.y][move.to.x] == null) {
-                        g2d.setColor(new Color(0xCB000000, true));
+                        g2d.setColor(new Color(0x83000000, true));
                         g2d.setStroke(new BasicStroke(1));
                         // black dot over sqaure to move to
                         g2d.fillOval(
@@ -535,21 +600,6 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
         return copy_board;
     }
 
-    private void print_board() {
-        for (Piece[] rank : board) {
-            for (Piece piece : rank) {
-                if (piece == null) {
-                    System.out.print("x");
-                }
-                else {
-                    System.out.print(piece.id);
-                }
-            }
-            System.out.println();
-        }
-        System.out.println();
-    }
-
     public void move_piece_in_place(Move move) {
         Point to = move.to;
         Point from = move.from;
@@ -584,6 +634,30 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
 
             if (move.to.y == 0 || move.to.y == 7) {
                 move.piece.promote();
+            }
+        }
+
+        // handle castling
+        if (Character.toLowerCase(move.piece.id) == 'k') {
+            if (Math.abs(move.to.x - move.from.x) == 2) {
+                // king was already moved above --> move the rook
+                if (move.to.x < move.from.x) {
+                    // queen side
+                    Piece qs_rook = board[move.piece.rank][0];
+                    move_piece_in_place(
+                            new Move(qs_rook, qs_rook.get_point(),
+                                    new Point(3, move.piece.rank)
+                            )
+                    );
+                } else {
+                    // king side
+                    Piece ks_rook = board[move.piece.rank][7];
+                    move_piece_in_place(
+                            new Move(ks_rook, ks_rook.get_point(),
+                                    new Point(5, move.piece.rank)
+                            )
+                    );
+                }
             }
         }
     }
