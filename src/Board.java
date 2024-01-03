@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.Objects;
 
 @SuppressWarnings("SpellCheckingInspection")
-public class Board extends JPanel implements MouseListener, MouseMotionListener {
+public class Board extends JPanel implements MouseListener, MouseMotionListener, KeyListener {
     int square_width = 75, square_height = 75;
     Frame parent;
     private Graphics2D g2d;
@@ -20,6 +20,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
 
     private final HashMap<Character, Point> piece_map = new HashMap<>();
     private final HashMap<Character, Point> test_piece_map = new HashMap<>();
+    private final Engine engine = new Engine(this);
 
     Board(int parent_width, int parent_height, Frame parent) {
         setLocation((parent_width - square_width*8)/2, (parent_height-square_height*8)/2 - 10);
@@ -33,7 +34,10 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
 
         addMouseListener(this);
         addMouseMotionListener(this);
+        addKeyListener(this);
         setVisible(true);
+        setFocusable(true);
+        requestFocusInWindow();
     }
 
     private void init_board() {
@@ -132,27 +136,25 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                                 case 0 -> {
                                     // there is an opposite colored knight attacking the king
                                     if (
-                                            Character.toLowerCase(target.id) == 'n'
+                                            target.type() == 'n'
                                     ) return true;
                                 }
                                 case 1 -> {
                                     // opposite colored rook or queen attacking the king
                                     if (
-                                            Character.toLowerCase(target.id) == 'r' ||
-                                            Character.toLowerCase(target.id) == 'q'
+                                            target.type() == 'r' || target.type() == 'q'
                                     ) return true;
                                 }
                                 case 2 -> {
                                     // opposite colored bishop or queen attacking the king
                                     if (
-                                            Character.toLowerCase(target.id) == 'b' ||
-                                            Character.toLowerCase(target.id) == 'q'
+                                            target.type() == 'b' || target.type() == 'q'
                                     ) return true;
                                 }
                                 case 3 -> {
                                     // pawn attacking the king
                                     if (
-                                            Character.toLowerCase(target.id) == 'p'
+                                            target.type() == 'p'
                                     ) return true;
                                 }
                             }
@@ -181,6 +183,8 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
         - making it true allows support for knights, who have more limited mobility
      */
     public ArrayList<Move> get_piece_moves(int[] piece_dx, int[] piece_dy, Piece piece, boolean early_exit) {
+        if (piece == null) return null;
+
         int y = piece.rank;
         int x = piece.file;
         ArrayList<Move> moves = new ArrayList<>();
@@ -198,47 +202,31 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                 Point tpoint = new Point(tx, ty);
                 Piece target = board[ty][tx];
 
+                Piece[][] test_board = test_move_piece(piece.get_point(), tpoint);
+                double move_eval = engine.evaluate(test_board);
 
-                boolean stops_check = false;
-                if (in_check) {
-                    stops_check = !king_in_check(
-                            test_move_piece(piece.get_point(), tpoint),
+                boolean king_in_check_from_move = king_in_check(
+                            test_board,
                             test_piece_map,
                             side_to_move
-                    );
-                }
+                );
 
+                /*
+                possible moves are open squares or captures:
+                - it is legal if the king is not in check after the move
+                 */
+                if (target == null || target.color == piece.color * -1){
+                    if (!king_in_check_from_move) {
+                        moves.add(new Move(piece, piece.get_point(), tpoint, move_eval));
+                    }
 
-                if (target == null) { // square is open
                     if (in_check) {
-                        if (stops_check) {
-                            moves.add(new Move(piece, piece.get_point(), tpoint));
-                            // a knight can block a check in multiple ways, so only
-                            // stop the search if it's any other piece type
-                            if (Character.toLowerCase(piece.id) != 'n') break;
-                        }
-                    } else {
-                        moves.add(new Move(piece, piece.get_point(), tpoint));
+                        if (piece.type() != 'n') break;
                     }
-                } else {
-                    if (target.color == (piece.color * -1)) {
-                        if (in_check) {
-                            if (stops_check) {
-                                moves.add(new Move(piece, piece.get_point(), tpoint));
-                                if (Character.toLowerCase(piece.id) != 'n') break;
-                            }
-                        }
-
-                        // ensure this move doesn't put king in check
-                        if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map, side_to_move)) {
-                            moves.add(new Move(piece, piece.get_point(), tpoint));
-                        }
-                    }
-                    // hit a piece --> no more searching this direction
-                    break;
                 }
 
-
+                // once you hit a piece in a direction, you're done
+                if (target != null) { break; }
                 if (early_exit) break;
 
                 scale += 1;
@@ -270,23 +258,27 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                     int tx = x + (dx * piece.color);
                     if (ty < 0 || ty > 7 || tx < 0 || tx > 7) continue;
                     Point tpoint = new Point(tx, ty);
+                    Piece[][] test_board = test_move_piece(piece.get_point(), tpoint);
+                    double move_eval = engine.evaluate(test_board);
 
                     Piece target = board[ty][tx];
+
+
                     if (target != null && target.color == (piece.color * -1)) { // piece is capturable
                         if (in_check) {
                             // if king is in check, only add moves which stop it
                             boolean stops_check = !king_in_check(
-                                    test_move_piece(piece.get_point(), tpoint),
+                                    test_board,
                                     test_piece_map,
                                     side_to_move
                             );
                             if (stops_check) {
-                                moves.add(new Move(piece, piece.get_point(), tpoint));
+                                moves.add(new Move(piece, piece.get_point(), tpoint, move_eval));
                             }
                         } else {
                             // if king is not in check, add moves which don't put him in check
-                            if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map, side_to_move)) {
-                                moves.add(new Move(piece, piece.get_point(), tpoint));
+                            if (!king_in_check(test_board, test_piece_map, side_to_move)) {
+                                moves.add(new Move(piece, piece.get_point(), tpoint, move_eval));
                             }
                         }
 
@@ -304,23 +296,26 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
 
                     // forward 1, over 1
                     Point tpoint = new Point(x + (dx * piece.color), y + piece.color);
+                    Piece[][] test_board = test_move_piece(piece.get_point(), tpoint);
+                    double move_eval = engine.evaluate(test_board);
+
                     if (target != null && target.color == (piece.color * -1)) { // capturable piece
-                        if (target.open_to_en_passant && Character.toLowerCase(target.id) == 'p') {
+                        if (target.open_to_en_passant && target.type() == 'p') {
                             if (in_check) {
                                 boolean stops_check = !king_in_check(
-                                        test_move_piece(piece.get_point(), tpoint),
+                                        test_board,
                                         test_piece_map,
                                         side_to_move
                                 );
                                 if (stops_check) {
-                                    moves.add(new Move(piece, piece.get_point(), tpoint, board[y][tx]));
+                                    moves.add(new Move(piece, piece.get_point(), tpoint, board[y][tx], move_eval));
                                 }
                             } else {
                                 // doesn't put king in check
                                 // run this last because it's the most computationally intensive
-                                if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map, side_to_move)) {
+                                if (!king_in_check(test_board, test_piece_map, side_to_move)) {
                                     moves.add(
-                                            new Move(piece, piece.get_point(), tpoint, board[y][tx])
+                                            new Move(piece, piece.get_point(), tpoint, board[y][tx], move_eval)
                                     );
                                 }
                             }
@@ -332,6 +327,9 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                 // move one forward if there are no pieces
                 if (board[y + piece.color][x] == null) {
                     Point tpoint = new Point(x, y + piece.color);
+                    Piece[][] test_board = test_move_piece(piece.get_point(), tpoint);
+                    double move_eval = engine.evaluate(test_board);
+
                     if (in_check) {
                         boolean stops_check = !king_in_check(
                                 test_move_piece(piece.get_point(), tpoint),
@@ -339,11 +337,11 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                                 side_to_move
                         );
                         if (stops_check) {
-                            moves.add(new Move(piece, piece.get_point(), tpoint));
+                            moves.add(new Move(piece, piece.get_point(), tpoint, move_eval));
                         }
                     } else {
                         if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map, side_to_move)) {
-                            moves.add(new Move(piece, piece.get_point(), tpoint));
+                            moves.add(new Move(piece, piece.get_point(), tpoint, move_eval));
                         }
                     }
 
@@ -357,11 +355,11 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                                     side_to_move
                             );
                             if (stops_check) {
-                                moves.add(new Move(piece, piece.get_point(), tpoint));
+                                moves.add(new Move(piece, piece.get_point(), tpoint, move_eval));
                             }
                         } else {
                             if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map, side_to_move)) {
-                                moves.add(new Move(piece, piece.get_point(), tpoint));
+                                moves.add(new Move(piece, piece.get_point(), tpoint, move_eval));
                             }
                         }
                     }
@@ -380,12 +378,14 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                     int tx = x + (dx * piece.color);
                     if (ty < 0 || ty > 7 || tx < 0 || tx > 7) continue;
                     Point tpoint = new Point(tx, ty);
+                    Piece[][] test_board = test_move_piece(piece.get_point(), tpoint);
+                    double move_eval = engine.evaluate(test_board);
 
                     Piece target = board[ty][tx];
                     if (target == null || target.color == (piece.color * -1)) { // square is open or can capture it
                         // and move does NOT put king in check
-                        if (!king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map, side_to_move)) {
-                            moves.add(new Move(piece, piece.get_point(), tpoint));
+                        if (!king_in_check(test_board, test_piece_map, side_to_move)) {
+                            moves.add(new Move(piece, piece.get_point(), tpoint, move_eval));
                         }
                     }
                 }
@@ -406,12 +406,9 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                     while (x_ <= 7) {
                         Piece p = board[piece.rank][x_];
                         if (p != null) {
-                            System.out.println("p.id = " + p.id);
-                            System.out.println("p.get_point() = " + p.get_point());
-
                             // if the piece is not == (either rook or king)
                             // parantheses are cruicial!
-                            if (!(Character.toLowerCase(p.id) == 'r' || Character.toLowerCase(p.id) == 'k')) {
+                            if (!(p.type() == 'r' || p.type() == 'k')) {
                                 // if there are any non-rook or king pieces on the back rank, castling not available
                                 // on this side --> check the other one
                                 if (x_ < piece.file) {
@@ -422,7 +419,6 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                             } else  {
                                 if (!p.has_not_moved) {
                                     // only rooks and kings, but the rooks have already moved, so castling unavailable
-                                    System.out.println("pieces have already moved");
                                     if (x_ < piece.file) {
                                         x_ = piece.file + 1;
                                         continue;
@@ -437,7 +433,6 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                             // --> must check whether moving there will put him in check (if so, invalid)
                             Point tpoint = new Point(x_, piece.rank);
                             if (king_in_check(test_move_piece(piece.get_point(), tpoint), test_piece_map, side_to_move)) {
-                                System.out.println("can't castle through check");
                                 if (x_ < piece.file) {
                                     x_ = piece.file + 1;
                                     continue;
@@ -452,7 +447,9 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                         if (x_ == piece.file || x_ == 8) {
                             // if either of these points are reached, that side castling is eligible
                             int dir = x_ == piece.file ? -1 : 1;
-                            moves.add(new Move(piece, piece.get_point(), new Point(piece.file + 2*dir, piece.rank)));
+                            Point tpoint = new Point(piece.file + 2*dir, piece.rank);
+                            double move_eval = engine.evaluate(test_move_piece(piece.get_point(), tpoint));
+                            moves.add(new Move(piece, piece.get_point(), tpoint, move_eval));
                         }
                     }
                 }
@@ -529,34 +526,8 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
             g2d.fillRect(curr_click.x * square_width, curr_click.y * square_height, square_width, square_height);
             g2d.setColor(new Color(0x7CFF3131, true));
             g2d.fillRect(curr_click.x * square_width, curr_click.y * square_height, square_width, square_height);
-
-            if (selected_piece != null) {
-                ArrayList<Move> legal_moves = get_legal_moves(selected_piece);
-                for (Move move : legal_moves) {
-                    if (move == null) break;
-
-//                    g2d.setColor(new Color(0x99BC6FFF, true));
-//                    g2d.fillRect(
-//                            move.x * square_width, move.y * square_height,
-//                            square_width, square_height
-//                    );
-
-                    // draw dot on legal moves
-                    if (board[move.to.y][move.to.x] == null) {
-                        g2d.setColor(new Color(0x83000000, true));
-                        g2d.setStroke(new BasicStroke(1));
-                        // black dot over sqaure to move to
-                        g2d.fillOval(
-                                move.to.x*square_width + square_width/2 - 10,
-                                move.to.y*square_height + square_height/2 - 10,
-                                20, 20
-                        );
-                    }
-                }
-            }
         }
 
-        // Put pieces ont top of the board
         for (Piece[] rank : board) {
             for (Piece piece : rank) {
                 if (piece == null) continue;
@@ -568,6 +539,31 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
                 );
             }
         }
+
+        if (selected_piece != null) {
+            ArrayList<Move> legal_moves = get_legal_moves(selected_piece);
+            for (Move move : legal_moves) {
+                if (move == null) break;
+
+//                    g2d.setColor(new Color(0x99BC6FFF, true));
+//                    g2d.fillRect(
+//                            move.x * square_width, move.y * square_height,
+//                            square_width, square_height
+//                    );
+
+                // draw dot on legal moves
+                g2d.setColor(new Color(0x7CFF3131, true));
+                g2d.setStroke(new BasicStroke(1));
+                // black dot over sqaure to move to
+                g2d.fillOval(
+                        move.to.x*square_width + square_width/2 - 10,
+                        move.to.y*square_height + square_height/2 - 10,
+                        20, 20
+                );
+            }
+        }
+
+        // Put pieces ont top of the board
     }
 
     private Piece[][] deep_copy_board() {
@@ -626,7 +622,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
         }
 
         // only give en passant rights to the one piece which just moved
-        if (Character.toLowerCase(move.piece.id) == 'p') {
+        if (move.piece.type() == 'p') {
             if (Math.abs(move.to.y - move.from.y) == 2) {
                 // pawn moved forward twice
                 board[move.to.y][move.to.x].open_to_en_passant = true;
@@ -638,14 +634,16 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
         }
 
         // handle castling
-        if (Character.toLowerCase(move.piece.id) == 'k') {
+        if (move.piece.type() == 'k') {
             if (Math.abs(move.to.x - move.from.x) == 2) {
                 // king was already moved above --> move the rook
                 if (move.to.x < move.from.x) {
                     // queen side
                     Piece qs_rook = board[move.piece.rank][0];
                     move_piece_in_place(
-                            new Move(qs_rook, qs_rook.get_point(),
+                            new Move(
+                                    qs_rook,
+                                    qs_rook.get_point(),
                                     new Point(3, move.piece.rank)
                             )
                     );
@@ -734,6 +732,24 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
     }
 
     @Override
+    public void keyTyped(KeyEvent e) {
+        System.out.println("asdfksadf");
+        switch (e.getKeyCode()) {
+            case KeyEvent.VK_LEFT -> {
+                System.out.println("left arrow press");
+            }
+            case KeyEvent.VK_RIGHT-> {
+                System.out.println("right arrow press");
+            }
+        }
+    }
+
+    @Override
+    public void keyPressed(KeyEvent e) {
+        System.out.println("pouwehounmacs");
+    }
+
+    @Override
     public void mouseClicked(MouseEvent e) {
 
     }
@@ -760,6 +776,11 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener 
 
     @Override
     public void mouseMoved(MouseEvent e) {
+
+    }
+
+    @Override
+    public void keyReleased(KeyEvent e) {
 
     }
 }

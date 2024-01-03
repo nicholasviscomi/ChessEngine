@@ -50,6 +50,9 @@ public class Piece {
         return Toolkit.getDefaultToolkit().getImage(path);
     }
 
+    public char type() {
+        return Character.toLowerCase(this.id);
+    }
     public Point get_point() {
         return new Point(file, rank);
     }
