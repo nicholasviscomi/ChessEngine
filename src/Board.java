@@ -20,15 +20,16 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener,
 
     private final HashMap<Character, Point> piece_map = new HashMap<>();
     private final HashMap<Character, Point> test_piece_map = new HashMap<>();
-    private final Engine engine = new Engine(this);
+    private final Engine engine;
 
-    Board(int parent_width, int parent_height, Frame parent) {
+    Board(int parent_width, int parent_height, Frame parent, Engine engine) {
         setLocation((parent_width - square_width*8)/2, (parent_height-square_height*8)/2 - 10);
         setSize(square_width * 8, square_height * 8);
         setLayout(null);
 
         this.parent = parent;
         this.curr_click = null;
+        this.engine = engine;
 
         init_board();
 
@@ -36,8 +37,6 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener,
         addMouseMotionListener(this);
         addKeyListener(this);
         setVisible(true);
-        setFocusable(true);
-        requestFocusInWindow();
     }
 
     private void init_board() {
@@ -611,7 +610,6 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener,
             board[p.y][p.x] = null;
         }
 
-
         // no matter what, remove en passant rights
         for (Piece[] pieces : board) {
             for (Piece piece : pieces) {
@@ -658,6 +656,8 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener,
                 }
             }
         }
+
+        engine.update_eval(move.evaluation);
     }
 
     public void play_sound(String path) {

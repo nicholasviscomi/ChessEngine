@@ -5,8 +5,8 @@ public class Frame extends JPanel {
     public JFrame frame;
     public int width = 800;
     public int height = 700;
-    private final Board board = new Board(width, height, this);
-    private final Engine engine = new Engine(board);
+    private final Engine engine = new Engine(width, height);
+    private final Board board = new Board(width, height, this, engine);
     JTextField fen;
 
     Frame() {
@@ -22,6 +22,7 @@ public class Frame extends JPanel {
         frame.setResizable(false);
         frame.setTitle("ШАХМАТЫ");
         frame.setLocationRelativeTo(null);
+        frame.getContentPane().setBackground(new Color(0x423D5E));
         Dimension d;
 
         fen = new JTextField();
@@ -38,6 +39,7 @@ public class Frame extends JPanel {
 //        frame.add(fen);
 //        frame.add(submit_fen);
         frame.add(board);
+        frame.add(engine);
         frame.setVisible(true);
     }
 
