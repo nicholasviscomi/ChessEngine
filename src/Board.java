@@ -706,7 +706,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener,
                     side_to_move *= -1;
                     // Random move generation
 //                    Move random_move = engine.random_piece_move(board);
-                    Move random_move = engine.search(board, side_to_move);
+                    Move random_move = engine.get_greedy_capture_move(board, side_to_move);
                     if (random_move != null) {
                         move_piece_in_place(random_move);
                     }

@@ -46,7 +46,7 @@ public class Engine extends JPanel {
             'k', 0
     );
 
-    public Move random_piece_move(Piece[][] board, int side_to_move) {
+    public Move get_random_piece_move(Piece[][] board, int side_to_move) {
         if (this.board == null) this.board = parent.get_board();
 
         ArrayList<Move> all_legal_moves = new ArrayList<>();
@@ -63,7 +63,11 @@ public class Engine extends JPanel {
         return all_legal_moves.get((int) (Math.random() * all_legal_moves.size()));
     }
 
-    public Move search(Piece[][] board, int side_to_move) {
+    /*
+    Searches for any move where it can capture the most materials and takes it—— no holds barred
+    Will lose any piece for material
+     */
+    public Move get_greedy_capture_move(Piece[][] board, int side_to_move) {
         if (this.board == null) this.board = parent.get_board();
 
         Move best_move = null;
@@ -74,13 +78,12 @@ public class Engine extends JPanel {
 
                 ArrayList<Move> moves = this.board.get_legal_moves(piece, side_to_move);
                 for (Move m : moves) {
-
-                    System.out.println("m.from = " + m.from);
-                    System.out.println("m.to = " + m.to);
-                    System.out.println("m.evaluation = " + m.evaluation);
                     if (best_move == null || m.evaluation < best_move.evaluation) {
                         // check for less than because a more negative eval means black is winning
                         best_move = m;
+                        equal_moves.clear(); // if there is a new better move, clear the equal moves and
+                        // then add to it if there are any other moves that equal this
+                        // new best move
                     }
                     if (best_move.evaluation == m.evaluation) {
                         equal_moves.add(m);
@@ -105,6 +108,60 @@ public class Engine extends JPanel {
             }
         }
 
+        // if all the moves are equal (e.x. there are multiple ways to capture a piece)
+        // pick a random one
+        if (best_move != null && equal_moves.size() > 0) {
+            if (best_move.evaluation == equal_moves.get(0).evaluation) {
+                return equal_moves.get( (int) (Math.random()*equal_moves.size()));
+            }
+        }
+
+        return best_move;
+    }
+
+    public Move search(Piece[][] board, int side_to_move) {
+        if (this.board == null) this.board = parent.get_board();
+
+        Move best_move = null;
+        ArrayList<Move> equal_moves = new ArrayList<>();
+        for (Piece[] row : board) {
+            for (Piece piece : row) {
+                if (piece == null || piece.color != side_to_move) continue;
+
+                ArrayList<Move> moves = this.board.get_legal_moves(piece, side_to_move);
+                for (Move m : moves) {
+                    if (best_move == null || m.evaluation < best_move.evaluation) {
+                        // check for less than because a more negative eval means black is winning
+                        best_move = m;
+                        equal_moves.clear(); // if there is a new better move, clear the equal moves and
+                                             // then add to it if there are any other moves that equal this
+                                             // new best move
+                    }
+                    if (best_move.evaluation == m.evaluation) {
+                        equal_moves.add(m);
+                    }
+
+                    // now search white's potential responses
+//                    Piece[][] test_board = this.board.test_move_piece(m.from, m.to);
+//                    for (Piece[] test_row : test_board) {
+//                        for (Piece test_piece : test_row) {
+//                            if (test_piece == null || test_piece.color != side_to_move * -1) continue;
+//
+//                            ArrayList<Move> test_moves = this.board.get_legal_moves(test_piece, side_to_move * -1);
+//                            for (Move test_move : test_moves) {
+//                                if (best_move == null || test_move.evaluation > best_move.evaluation) {
+//                                    best_move = m;
+//                                }
+//                            }
+//                        }
+//                    }
+
+                }
+            }
+        }
+
+        // if all the moves are equal (e.x. there are multiple ways to capture a piece)
+        // pick a random one
         if (best_move != null && equal_moves.size() > 0) {
             if (best_move.evaluation == equal_moves.get(0).evaluation) {
                 return equal_moves.get( (int) (Math.random()*equal_moves.size()));
