@@ -1,14 +1,18 @@
 import javax.swing.*;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
 public class Engine extends JPanel {
     int square_width = 75, square_height = 75;
     double current_eval = 0.0;
-    Engine(int parent_width, int parent_height) {
+    Board board = null;
+    Frame parent;
+    Engine(int parent_width, int parent_height, Frame parent) {
         setLocation((parent_width - square_width*8)/2 - 40, (parent_height-square_height*8)/2 - 10);
         setSize(30, square_height*8);
+        this.parent = parent;
     }
 
     @Override
@@ -42,14 +46,72 @@ public class Engine extends JPanel {
             'k', 0
     );
 
-    public Move search(Piece[][] board) {
-        for (Piece[] row: board) {
-            for (Piece piece : row) {
+    public Move random_piece_move(Piece[][] board, int side_to_move) {
+        if (this.board == null) this.board = parent.get_board();
 
+        ArrayList<Move> all_legal_moves = new ArrayList<>();
+
+        for (Piece[] row : board) {
+            for (Piece piece : row) {
+                if (piece == null || piece.color != this.board.get_side_to_move()) continue;
+                all_legal_moves.addAll(this.board.get_legal_moves(piece, side_to_move));
             }
         }
 
-        return null;
+        if (all_legal_moves.size() == 0) return null;
+
+        return all_legal_moves.get((int) (Math.random() * all_legal_moves.size()));
+    }
+
+    public Move search(Piece[][] board, int side_to_move) {
+        if (this.board == null) this.board = parent.get_board();
+
+        Move best_move = null;
+        ArrayList<Move> equal_moves = new ArrayList<>();
+        for (Piece[] row : board) {
+            for (Piece piece : row) {
+                if (piece == null || piece.color != side_to_move) continue;
+
+                ArrayList<Move> moves = this.board.get_legal_moves(piece, side_to_move);
+                for (Move m : moves) {
+
+                    System.out.println("m.from = " + m.from);
+                    System.out.println("m.to = " + m.to);
+                    System.out.println("m.evaluation = " + m.evaluation);
+                    if (best_move == null || m.evaluation < best_move.evaluation) {
+                        // check for less than because a more negative eval means black is winning
+                        best_move = m;
+                    }
+                    if (best_move.evaluation == m.evaluation) {
+                        equal_moves.add(m);
+                    }
+
+                    // now search white's potential responses
+//                    Piece[][] test_board = this.board.test_move_piece(m.from, m.to);
+//                    for (Piece[] test_row : test_board) {
+//                        for (Piece test_piece : test_row) {
+//                            if (test_piece == null || test_piece.color != side_to_move * -1) continue;
+//
+//                            ArrayList<Move> test_moves = this.board.get_legal_moves(test_piece, side_to_move * -1);
+//                            for (Move test_move : test_moves) {
+//                                if (best_move == null || test_move.evaluation > best_move.evaluation) {
+//                                    best_move = m;
+//                                }
+//                            }
+//                        }
+//                    }
+
+                }
+            }
+        }
+
+        if (best_move != null && equal_moves.size() > 0) {
+            if (best_move.evaluation == equal_moves.get(0).evaluation) {
+                return equal_moves.get( (int) (Math.random()*equal_moves.size()));
+            }
+        }
+
+        return best_move;
     }
 
     public double evaluate(Piece[][] board) {

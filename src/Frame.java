@@ -5,7 +5,7 @@ public class Frame extends JPanel {
     public JFrame frame;
     public int width = 800;
     public int height = 700;
-    private final Engine engine = new Engine(width, height);
+    private final Engine engine = new Engine(width, height, this);
     private final Board board = new Board(width, height, this, engine);
     JTextField fen;
 
@@ -43,8 +43,11 @@ public class Frame extends JPanel {
         frame.setVisible(true);
     }
 
+    public Board get_board() {
+        return board;
+    }
+
     public static void main(String[] args) {
         new Frame();
-
     }
 }

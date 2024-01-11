@@ -22,6 +22,9 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener,
     private final HashMap<Character, Point> test_piece_map = new HashMap<>();
     private final Engine engine;
 
+    public int get_side_to_move() {
+        return side_to_move;
+    }
     Board(int parent_width, int parent_height, Frame parent, Engine engine) {
         setLocation((parent_width - square_width*8)/2, (parent_height-square_height*8)/2 - 10);
         setSize(square_width * 8, square_height * 8);
@@ -41,7 +44,6 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener,
 
     private void init_board() {
         String fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
-//        String fen = "rnbqkbnr/ppp1pppp/4P3/8/8/3p4/PPPP1PPP/RNBQKBNR";
 
         board = new Piece[8][8];
         int file = 0, rank = 0;
@@ -236,7 +238,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener,
         return moves;
     }
 
-    public ArrayList<Move> get_legal_moves(Piece piece) {
+    public ArrayList<Move> get_legal_moves(Piece piece, int side_to_move) {
         ArrayList<Move> moves = new ArrayList<>();
 
         boolean in_check = king_in_check(board, piece_map, side_to_move);
@@ -540,7 +542,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener,
         }
 
         if (selected_piece != null) {
-            ArrayList<Move> legal_moves = get_legal_moves(selected_piece);
+            ArrayList<Move> legal_moves = get_legal_moves(selected_piece, side_to_move);
             for (Move move : legal_moves) {
                 if (move == null) break;
 
@@ -672,6 +674,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener,
             ex.printStackTrace();
         }
     }
+
     @Override
     public void mousePressed(MouseEvent e) {
         // Handle clicking on a piece
@@ -683,7 +686,7 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener,
 
         // check to see if a move should be made
         if (selected_piece != null) {
-            for (Move move : get_legal_moves(selected_piece)) {
+            for (Move move : get_legal_moves(selected_piece, side_to_move)) {
                 if (trans_p.equals(move.to)) {
 
                     // need to specify here that the opposite king should be searched and not the side_to_move king
@@ -699,6 +702,14 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener,
                     }
 
                     move_piece_in_place(move);
+
+                    side_to_move *= -1;
+                    // Random move generation
+//                    Move random_move = engine.random_piece_move(board);
+                    Move random_move = engine.search(board, side_to_move);
+                    if (random_move != null) {
+                        move_piece_in_place(random_move);
+                    }
 
                     curr_click = null;
                     selected_piece = null;
