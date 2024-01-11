@@ -6,6 +6,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 @SuppressWarnings("SpellCheckingInspection")
@@ -675,6 +676,19 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener,
         }
     }
 
+    private void play_sound_for_move(Move move) {
+        if (king_in_check(test_move_piece(move.from, move.to), test_piece_map, side_to_move * -1)) {
+            play_sound("materials/audio/check.wav");
+        } else if (board[move.to.y][move.to.x] != null) {
+            // piece is being captured
+            play_sound("materials/audio/piece-capture.wav");
+
+        } else {
+            // regular move
+            play_sound("materials/audio/piece-move.wav");
+        }
+    }
+
     @Override
     public void mousePressed(MouseEvent e) {
         // Handle clicking on a piece
@@ -689,26 +703,18 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener,
             for (Move move : get_legal_moves(selected_piece, side_to_move)) {
                 if (trans_p.equals(move.to)) {
 
-                    // need to specify here that the opposite king should be searched and not the side_to_move king
-                    if (king_in_check(test_move_piece(move.from, move.to), test_piece_map, side_to_move * -1)) {
-                        play_sound("materials/audio/check.wav");
-                    } else if (board[move.to.y][move.to.x] != null) {
-                        // piece is being captured
-                        play_sound("materials/audio/piece-capture.wav");
-
-                    } else {
-                        // regular move
-                        play_sound("materials/audio/piece-move.wav");
-                    }
-
+                    play_sound_for_move(move);
                     move_piece_in_place(move);
 
                     side_to_move *= -1;
                     // Random move generation
-//                    Move random_move = engine.random_piece_move(board);
-                    Move random_move = engine.get_greedy_capture_move(board, side_to_move);
-                    if (random_move != null) {
-                        move_piece_in_place(random_move);
+//                    Move engine_move = engine.get_random_piece_move(board, side_to_move);
+//                    Move engine_move = engine.get_greedy_capture_move(board, side_to_move);
+                    Move engine_move = engine.get_greedy_move_with_tables(board, side_to_move);
+
+                    if (engine_move != null) {
+                        play_sound_for_move(engine_move);
+                        move_piece_in_place(engine_move);
                     }
 
                     curr_click = null;
@@ -740,6 +746,10 @@ public class Board extends JPanel implements MouseListener, MouseMotionListener,
         }
 
         repaint();
+    }
+
+    public HashMap<Character, Point> get_test_piece_map() {
+        return test_piece_map;
     }
 
     @Override
